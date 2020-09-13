@@ -153,22 +153,22 @@ macro_rules! path(
         Path($x0, path!([$($x),*] $z))
     };
     ([$x:expr] [$x1:expr] [$x2:expr] [$x3:expr] [$x4:expr] [$x5:expr] [$x6:expr] $z:expr) => {
-        Path($x, Path($x1, Path($x2, Path($x3, Path($x4, Path($x5, Path($x6, Item($z))))))))
+        Path($x, path!([$x1] [$x2] [$x3] [$x4] [$x5] [$x6] Item($z)))
     };
     ([$x:expr] [$x1:expr] [$x2:expr] [$x3:expr] [$x4:expr] [$x5:expr] $z:expr) => {
-        Path($x, Path($x1, Path($x2, Path($x3, Path($x4, Path($x5, Item($z)))))))
+        Path($x, path!([$x1] [$x2] [$x3] [$x4] [$x5] Item($z)))
     };
     ([$x:expr] [$x1:expr] [$x2:expr] [$x3:expr] [$x4:expr] $z:expr) => {
-        Path($x, Path($x1, Path($x2, Path($x3, Path($x4, Item($z))))))
+        Path($x, path!([$x1] [$x2] [$x3] [$x4] Item($z)))
     };
     ([$x:expr] [$x1:expr] [$x2:expr] [$x3:expr] $z:expr) => {
-        Path($x, Path($x1, Path($x2, Path($x3, Item($z)))))
+        Path($x, path!([$x1] [$x2] [$x3] Item($z)))
     };
     ([$x:expr] [$x1:expr] [$x2:expr] $z:expr) => {
-        Path($x, Path($x1, Path($x2, Item($z))))
+        Path($x, path!([$x1] [$x2] Item($z)))
     };
     ([$x:expr] [$y:expr] $z:expr) => {
-        Path($x, expand_path_items!([$y] $z))
+        Path($x, path!([$y] $z))
     };
     ([$x:ident ($y:expr)] $z:expr) => {
         Path(crate::PApp::papp($x, $y), Item($z))
@@ -364,12 +364,12 @@ impl<T, U, V, W, W2, I1, I2> HigherIntoIterator<Item<V>> for Comp<T, U>
           I2: Iterator<Item = W2>
 {
     type Item = W2;
-    type IntoIter = PathIterator<I2, I1, T>;
+    type IntoIter = PathIter<I2, I1, T>;
     fn hinto_iter(self, Item(arg): Item<V>) -> Self::IntoIter {
         let Comp(a, b) = self;
         let mut in_iter = b.hinto_iter(arg);
         let out_iter = in_iter.next().map(|u| a.clone().hinto_iter(Item(u)));
-        PathIterator {
+        PathIter {
             in_iter,
             out_iter,
             arg: a
@@ -388,13 +388,13 @@ impl<T, U, V, W, I> HigherIntoIterator<Path<U, V>> for T
 }
 
 /// Iterates over a path composition, e.g. `[f] [g] a`.
-pub struct PathIterator<T, U, V> {
+pub struct PathIter<T, U, V> {
     out_iter: Option<T>,
     in_iter: U,
     arg: V,
 }
 
-impl<T, U, V> Iterator for PathIterator<T, U, V>
+impl<T, U, V> Iterator for PathIter<T, U, V>
     where T: Iterator, U: Iterator, V: Clone,
           Path<V, Item<U::Item>>: IntoIterator<Item = T::Item, IntoIter = T>
 {
