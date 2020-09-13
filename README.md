@@ -108,7 +108,7 @@ which is extensionally equal to partial application,
 but captures the underlying function in a closure.
 
 The `path!` macro expands to partial application automatically, but it is very limited.
-Outside the macro `path!` or for complex cases, one must use `PApp::app`.
+Outside the macro `path!` or for complex cases, one must use `PApp::papp`.
 
 ### Example: AND 3
 
