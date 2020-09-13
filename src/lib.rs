@@ -131,14 +131,6 @@ use std::iter::IntoIterator;
 
 pub use boolean::*;
 
-/// Internal macro.
-#[macro_export]
-macro_rules! expand_path_items(
-    ($($x:tt)*) => {
-        path!($($x)*)
-    }
-);
-
 /// Syntax sugar for a path sub-type.
 ///
 /// For example:
