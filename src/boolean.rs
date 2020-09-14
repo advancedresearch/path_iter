@@ -1,3 +1,4 @@
+
 use crate::*;
 
 /// Logical NOT.
@@ -31,6 +32,7 @@ pub struct True1;
 /// Returns the argument of a boolean unary function.
 #[derive(Clone)]
 pub struct Idb;
+
 
 /// Returns the first argument of a boolean binary function.
 #[derive(Clone)]
@@ -79,7 +81,7 @@ impl PApp for Eqb {
 impl PApp for Fstb {
     type Arg = bool;
     type Ret = Item<bool>;
-    fn papp(self, b: bool) -> Self::Ret {Item(b)}
+    fn papp(self, b: bool) -> Self::Ret {item(b)}
 }
 
 impl PApp for Sndb {
@@ -88,19 +90,11 @@ impl PApp for Sndb {
     fn papp(self, _: bool) -> Self::Ret {Idb}
 }
 
-impl IntoIterator for Item<bool> {
-    type Item = bool;
-    type IntoIter = <Option<bool> as IntoIterator>::IntoIter;
-    fn into_iter(self) -> Self::IntoIter {
-        Some(self.0).into_iter()
-    }
-}
-
 impl HigherIntoIterator<Item<bool>> for False1 {
     type Item = bool;
     type IntoIter = std::vec::IntoIter<bool>;
-    fn hinto_iter(self, Item(arg): Item<bool>) -> Self::IntoIter {
-        match arg {
+    fn hinto_iter(self, arg: Item<bool>) -> Self::IntoIter {
+        match arg.inner() {
             false => vec![false, true].into_iter(),
             true => vec![].into_iter()
         }
@@ -110,8 +104,8 @@ impl HigherIntoIterator<Item<bool>> for False1 {
 impl HigherIntoIterator<Item<bool>> for True1 {
     type Item = bool;
     type IntoIter = std::vec::IntoIter<bool>;
-    fn hinto_iter(self, Item(arg): Item<bool>) -> Self::IntoIter {
-        False1.hinto_iter(Item(!arg))
+    fn hinto_iter(self, arg: Item<bool>) -> Self::IntoIter {
+        False1.hinto_iter(item(!arg.inner()))
     }
 }
 
@@ -126,16 +120,16 @@ impl HigherIntoIterator<Item<bool>> for Idb {
 impl HigherIntoIterator<Item<bool>> for Not {
     type Item = bool;
     type IntoIter = <Option<bool> as IntoIterator>::IntoIter;
-    fn hinto_iter(self, Item(arg): Item<bool>) -> Self::IntoIter {
-        Item(!arg).into_iter()
+    fn hinto_iter(self, arg: Item<bool>) -> Self::IntoIter {
+        item(!arg.inner()).into_iter()
     }
 }
 
 impl HigherIntoIterator<Item<bool>> for And {
     type Item = (bool, bool);
     type IntoIter = std::vec::IntoIter<(bool, bool)>;
-    fn hinto_iter(self, Item(arg): Item<bool>) -> Self::IntoIter {
-        match arg {
+    fn hinto_iter(self, arg: Item<bool>) -> Self::IntoIter {
+        match arg.inner() {
             false => vec![
                 (false, false),
                 (false, true),
@@ -151,8 +145,8 @@ impl HigherIntoIterator<Item<bool>> for And {
 impl HigherIntoIterator<Item<bool>> for Or {
     type Item = (bool, bool);
     type IntoIter = std::vec::IntoIter<(bool, bool)>;
-    fn hinto_iter(self, Item(arg): Item<bool>) -> Self::IntoIter {
-        match arg {
+    fn hinto_iter(self, arg: Item<bool>) -> Self::IntoIter {
+        match arg.inner() {
             false => vec![
                 (false, false),
             ].into_iter(),
@@ -168,8 +162,8 @@ impl HigherIntoIterator<Item<bool>> for Or {
 impl HigherIntoIterator<Item<bool>> for Eqb {
     type Item = (bool, bool);
     type IntoIter = std::vec::IntoIter<(bool, bool)>;
-    fn hinto_iter(self, Item(arg): Item<bool>) -> Self::IntoIter {
-        match arg {
+    fn hinto_iter(self, arg: Item<bool>) -> Self::IntoIter {
+        match arg.inner() {
             false => vec![
                 (false, true),
                 (true, false)
@@ -185,16 +179,16 @@ impl HigherIntoIterator<Item<bool>> for Eqb {
 impl HigherIntoIterator<Item<bool>> for Xor {
     type Item = (bool, bool);
     type IntoIter = std::vec::IntoIter<(bool, bool)>;
-    fn hinto_iter(self, Item(arg): Item<bool>) -> Self::IntoIter {
-        Eqb.hinto_iter(Item(!arg))
+    fn hinto_iter(self, arg: Item<bool>) -> Self::IntoIter {
+        Eqb.hinto_iter(item(!arg.inner()))
     }
 }
 
 impl HigherIntoIterator<Item<bool>> for Fstb {
     type Item = (bool, bool);
     type IntoIter = std::vec::IntoIter<(bool, bool)>;
-    fn hinto_iter(self, Item(arg): Item<bool>) -> Self::IntoIter {
-        match arg {
+    fn hinto_iter(self, arg: Item<bool>) -> Self::IntoIter {
+        match arg.inner() {
             false => vec![
                 (false, false),
                 (false, true)
@@ -210,8 +204,8 @@ impl HigherIntoIterator<Item<bool>> for Fstb {
 impl HigherIntoIterator<Item<bool>> for Sndb {
     type Item = (bool, bool);
     type IntoIter = std::vec::IntoIter<(bool, bool)>;
-    fn hinto_iter(self, Item(arg): Item<bool>) -> Self::IntoIter {
-        match arg {
+    fn hinto_iter(self, arg: Item<bool>) -> Self::IntoIter {
+        match arg.inner() {
             false => vec![
                 (false, false),
                 (true, false)

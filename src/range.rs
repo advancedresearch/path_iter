@@ -11,7 +11,8 @@ impl<T> HigherIntoIterator<Item<Range<T>>> for Neg
 {
     type Item = T;
     type IntoIter = Range<T>;
-    fn hinto_iter(self, Item(arg): Item<Range<T>>) -> Self::IntoIter {
+    fn hinto_iter(self, arg: Item<Range<T>>) -> Self::IntoIter {
+        let arg = arg.inner();
         Range {start: T::from(1) - arg.end, end: T::from(1) - arg.start}
     }
 }
@@ -19,7 +20,8 @@ impl<T> HigherIntoIterator<Item<Range<T>>> for Neg
 impl HigherIntoIterator<Item<i64>> for Neg {
     type Item = i64;
     type IntoIter = Range<i64>;
-    fn hinto_iter(self, Item(arg): Item<i64>) -> Self::IntoIter {
+    fn hinto_iter(self, arg: Item<i64>) -> Self::IntoIter {
+        let arg = arg.inner();
         Range {start: -arg, end: 1-arg}
     }
 }
@@ -55,7 +57,8 @@ impl HigherIntoIterator<Item<Range<i64>>> for Add
 {
     type Item = (i64, i64);
     type IntoIter = AddRangeIter;
-    fn hinto_iter(self, Item(arg): Item<Range<i64>>) -> Self::IntoIter {
+    fn hinto_iter(self, arg: Item<Range<i64>>) -> Self::IntoIter {
+        let arg = arg.inner();
         AddRangeIter {
             ind: arg.start,
             range: arg,
@@ -67,7 +70,8 @@ impl HigherIntoIterator<Item<Range<i64>>> for Add
 impl HigherIntoIterator<Item<i64>> for Add {
     type Item = (i64, i64);
     type IntoIter = AddRangeIter;
-    fn hinto_iter(self, Item(arg): Item<i64>) -> Self::IntoIter {
-        Add.hinto_iter(Item(arg..arg+1))
+    fn hinto_iter(self, arg: Item<i64>) -> Self::IntoIter {
+        let arg = arg.inner();
+        Add.hinto_iter(item(arg..arg+1))
     }
 }
