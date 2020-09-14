@@ -437,11 +437,11 @@ impl<T, U, W, I, W2, I2> IntoIterator for PathComp<T, U>
     type IntoIter = PathIter<I2, I, T>;
     fn into_iter(self) -> Self::IntoIter {
         let Path(a, b) = self;
-        let mut in_iter = b.inner_right().into_iter();
-        let out_iter = in_iter.next().map(|u| a.clone().hinto_iter(item(u)));
+        let in_iter = b.inner_right().into_iter();
         PathIter {
             in_iter,
-            out_iter,
+            out_iter: vec![],
+            out_ind: 0,
             arg: a
         }
     }
@@ -449,8 +449,9 @@ impl<T, U, W, I, W2, I2> IntoIterator for PathComp<T, U>
 
 /// Iterates over a path composition, e.g. `[f] [g] a`.
 pub struct PathIter<T, U, V> {
-    out_iter: Option<T>,
+    out_iter: Vec<T>,
     in_iter: U,
+    out_ind: usize,
     arg: V,
 }
 
@@ -461,19 +462,23 @@ impl<T, U, V> Iterator for PathIter<T, U, V>
     type Item = T::Item;
     fn next(&mut self) -> Option<T::Item> {
         loop {
-            if let Some(out_iter) = &mut self.out_iter {
-                let v = out_iter.next();
+            while self.out_ind < self.out_iter.len() {
+                let v = self.out_iter[self.out_ind].next();
                 if v.is_some() {
+                    self.out_ind += 1;
                     return v;
-                }
-                if let Some(u) = self.in_iter.next() {
-                    *out_iter = self.arg.clone().hinto_iter(item(u));
                 } else {
-                    return None;
+                    self.out_iter.swap_remove(self.out_ind);
                 }
-            } else {
+            }
+
+            if let Some(u) = self.in_iter.next() {
+                self.out_iter.push(self.arg.clone().hinto_iter(item(u)));
+            } else if self.out_iter.len() == 0 {
                 return None;
             }
+
+            self.out_ind = 0;
         }
     }
 }
