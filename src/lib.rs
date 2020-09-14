@@ -148,48 +148,46 @@ pub use range::*;
 #[macro_export]
 macro_rules! path(
     ([$x:ident ($y:expr)] $([$($z:tt)*])+ $w:expr) => {
-        Path(crate::PApp::papp($x, $y), path!($([$($z)*])+ $w))
+        Path($crate::PApp::papp($x, $y), path!($([$($z)*])+ $w))
     };
     ([$x0:expr , $($x:expr),+ $(,)?] $z:expr) => {
-        Path($x0, path!([$($x),*] $z))
+        path($x0, path!([$($x),*] $z))
     };
     ([$x:expr] [$x1:expr] [$x2:expr] [$x3:expr] [$x4:expr] [$x5:expr] [$x6:expr] $z:expr) => {
-        Path($x, path!([$x1] [$x2] [$x3] [$x4] [$x5] [$x6] Item($z)))
+        path($x, path!([$x1] [$x2] [$x3] [$x4] [$x5] [$x6] $z))
     };
     ([$x:expr] [$x1:expr] [$x2:expr] [$x3:expr] [$x4:expr] [$x5:expr] $z:expr) => {
-        Path($x, path!([$x1] [$x2] [$x3] [$x4] [$x5] Item($z)))
+        path($x, path!([$x1] [$x2] [$x3] [$x4] [$x5] $z))
     };
     ([$x:expr] [$x1:expr] [$x2:expr] [$x3:expr] [$x4:expr] $z:expr) => {
-        Path($x, path!([$x1] [$x2] [$x3] [$x4] Item($z)))
+        path($x, path!([$x1] [$x2] [$x3] [$x4] $z))
     };
     ([$x:expr] [$x1:expr] [$x2:expr] [$x3:expr] $z:expr) => {
-        Path($x, path!([$x1] [$x2] [$x3] Item($z)))
+        path($x, path!([$x1] [$x2] [$x3] $z))
     };
     ([$x:expr] [$x1:expr] [$x2:expr] $z:expr) => {
-        Path($x, path!([$x1] [$x2] Item($z)))
+        path($x, path!([$x1] [$x2] $z))
     };
     ([$x:expr] [$y:expr] $z:expr) => {
-        Path($x, path!([$y] $z))
+        path($x, path!([$y] $z))
     };
     ([$x:ident ($y:expr)] $z:expr) => {
-        Path(crate::PApp::papp($x, $y), Item($z))
+        Path($crate::PApp::papp($x, $y), $crate::item($z))
     };
     ([$x:expr] $y:expr) => {
-        Path($x, Item($y))
+        Path($x, $crate::item($y))
     };
 );
 
-/// Used to wrap value types to avoid impl collisions.
+/// Stores a path sub-type with either `[T] U` (left) or `[T] [V] ...` (right).
 #[derive(Clone)]
-pub struct Item<T>(pub T);
+pub struct Path<T, U, V>(pub T, pub Either<U, V>);
 
-/// Stores a path sub-type `[T] U`.
-#[derive(Clone)]
-pub struct Path<T, U>(pub T, pub U);
+/// Represents a terminal path `[T] U`.
+pub type PathEnd<T, U> = Path<T, U, Empty>;
 
-impl<T> From<Item<T>> for Item<Item<T>> {
-    fn from(val: Item<T>) -> Self {Item(val)}
-}
+/// Represents a path composition.
+pub type PathComp<T, V> = Path<T, Empty, V>;
 
 mod boolean;
 mod range;
@@ -225,6 +223,56 @@ pub enum Either<T, U> {
     Left(T),
     /// The right iterator generator.
     Right(U)
+}
+
+/// A type that is impossible to construct.
+#[derive(Clone)]
+pub enum Empty {}
+
+/// Used to make end of path disambiguous from path composition.
+pub type Item<T> = Either<T, Empty>;
+
+/// Constructs an item.
+pub fn item<T>(a: T) -> Item<T> {Either::Left(a)}
+
+/// Construct a path composition.
+pub fn path<T, U>(a: T, b: U) -> PathComp<T, U> {Path(a, Either::Right(b))}
+
+impl<T> Item<T> {
+    /// Gets the inner value.
+    pub fn inner(self) -> T {
+        if let Either::Left(a) = self {
+            a
+        } else {
+            // This is unreachable because `Empty` can not be constructed.
+            unreachable!()
+        }
+    }
+}
+
+impl<T> Either<Empty, T> {
+    /// Gets the inner right value.
+    pub fn inner_right(self) -> T {
+        if let Either::Right(a) = self {
+            a
+        } else {
+            // This is unreachable because `Empty` can not be constructed.
+            unreachable!()
+        }
+    }
+}
+
+impl<T> IntoIterator for Item<T> {
+    type Item = T;
+    type IntoIter = <Option<T> as IntoIterator>::IntoIter;
+    fn into_iter(self) -> Self::IntoIter {
+        if let Either::Left(a) = self {
+            Some(a).into_iter()
+        } else {
+            // This is unreachable because `Empty` can not be constructed.
+            unreachable!()
+        }
+    }
 }
 
 impl<T, U, V> Iterator for EitherIter<T, U>
@@ -286,31 +334,22 @@ pub trait HigherIntoIterator<T> {
     fn hinto_iter(self, a: T) -> Self::IntoIter;
 }
 
-impl<T, U1, U2> HigherIntoIterator<Item<(U1, U2)>> for T
-    where T: HigherIntoIterator<(Item<U1>, Item<U2>)>
-{
-    type Item = T::Item;
-    type IntoIter = T::IntoIter;
-    fn hinto_iter(self, Item((a, b)): Item<(U1, U2)>) -> Self::IntoIter {
-        self.hinto_iter((Item(a), Item(b)))
-    }
-}
-
-impl<T1, T2, U1, U2, V1, V2, I1, I2> HigherIntoIterator<(Item<U1>, Item<U2>)> for (T1, T2)
+impl<T1, T2, U1, U2, V1, V2, I1, I2> HigherIntoIterator<Item<(U1, U2)>> for (T1, T2)
     where T1: HigherIntoIterator<Item<U1>, Item = V1, IntoIter = I1>,
           T2: Clone + HigherIntoIterator<Item<U2>, Item = V2, IntoIter = I2>,
           I1: Iterator<Item = V1>,
-          Item<U2>: Clone
+          U2: Clone
 {
     type Item = (V1, V2);
-    type IntoIter = ProductIter<I1, I2, Path<T2, Item<U2>>, V1>;
-    fn hinto_iter(self, (u1, u2): (Item<U1>, Item<U2>)) -> Self::IntoIter {
+    type IntoIter = ProductIter<I1, I2, PathEnd<T2, U2>, V1>;
+    fn hinto_iter(self, arg: Item<(U1, U2)>) -> Self::IntoIter {
+        let (u1, u2) = arg.inner();
         let (a, b) = self;
-        let mut inner = a.hinto_iter(u1);
+        let mut inner = a.hinto_iter(item(u1));
         let inner_val = inner.next();
-        let outer = b.clone().hinto_iter(u2.clone());
+        let outer = b.clone().hinto_iter(item(u2.clone()));
         ProductIter {
-            inner, inner_val, outer, outer_ty: Path(b, u2)
+            inner, inner_val, outer, outer_ty: Path(b, item(u2))
         }
     }
 }
@@ -342,8 +381,8 @@ impl<T, U, V, W, I1, I2> HigherIntoIterator<Item<V>> for Either<T, U>
     }
 }
 
-impl<T, U, V, W> IntoIterator for Path<T, U>
-    where T: HigherIntoIterator<U, Item = W, IntoIter = V>,
+impl<T, U, V, W> IntoIterator for PathEnd<T, U>
+    where T: HigherIntoIterator<Item<U>, Item = W, IntoIter = V>,
           V: Iterator<Item = W>
 {
     type Item = W;
@@ -353,39 +392,23 @@ impl<T, U, V, W> IntoIterator for Path<T, U>
     }
 }
 
-/// Function composition.
-///
-/// For example, `Comp(Not, Not)` is the same as `Idb`.
-#[derive(Clone)]
-pub struct Comp<T, U>(pub T, pub U);
-
-impl<T, U, V, W, W2, I1, I2> HigherIntoIterator<Item<V>> for Comp<T, U>
-    where U: HigherIntoIterator<V, Item = W, IntoIter = I1>,
+impl<T, U, W, I, W2, I2> IntoIterator for PathComp<T, U>
+    where U: IntoIterator<Item = W, IntoIter = I>,
           T: Clone + HigherIntoIterator<Item<W>, Item = W2, IntoIter = I2>,
-          I1: Iterator<Item = W>,
+          I: Iterator<Item = W>,
           I2: Iterator<Item = W2>
 {
     type Item = W2;
-    type IntoIter = PathIter<I2, I1, T>;
-    fn hinto_iter(self, Item(arg): Item<V>) -> Self::IntoIter {
-        let Comp(a, b) = self;
-        let mut in_iter = b.hinto_iter(arg);
-        let out_iter = in_iter.next().map(|u| a.clone().hinto_iter(Item(u)));
+    type IntoIter = PathIter<I2, I, T>;
+    fn into_iter(self) -> Self::IntoIter {
+        let Path(a, b) = self;
+        let mut in_iter = b.inner_right().into_iter();
+        let out_iter = in_iter.next().map(|u| a.clone().hinto_iter(item(u)));
         PathIter {
             in_iter,
             out_iter,
             arg: a
         }
-    }
-}
-
-impl<T, U, V, W, I> HigherIntoIterator<Path<U, V>> for T
-    where Comp<T, U>: HigherIntoIterator<Item<V>, Item = W, IntoIter = I>
-{
-    type Item = W;
-    type IntoIter = I;
-    fn hinto_iter(self, Path(a, b): Path<U, V>) -> Self::IntoIter {
-        Comp(self, a).hinto_iter(Item(b))
     }
 }
 
@@ -398,7 +421,7 @@ pub struct PathIter<T, U, V> {
 
 impl<T, U, V> Iterator for PathIter<T, U, V>
     where T: Iterator, U: Iterator, V: Clone,
-          Path<V, Item<U::Item>>: IntoIterator<Item = T::Item, IntoIter = T>
+          V: HigherIntoIterator<Item<U::Item>, Item = T::Item, IntoIter = T>
 {
     type Item = T::Item;
     fn next(&mut self) -> Option<T::Item> {
@@ -409,7 +432,7 @@ impl<T, U, V> Iterator for PathIter<T, U, V>
                     return v;
                 }
                 if let Some(u) = self.in_iter.next() {
-                    *out_iter = Path(self.arg.clone(), Item(u)).into_iter();
+                    *out_iter = self.arg.clone().hinto_iter(item(u));
                 } else {
                     return None;
                 }
@@ -426,11 +449,11 @@ mod tests {
 
     #[test]
     fn it_works() {
-        assert_eq!(Item(true).into_iter().next(), Some(true));
-        assert_eq!(Item(false).into_iter().next(), Some(false));
-        assert_eq!(Path(Not, Item(true)).into_iter().next(), Some(false));
-        assert_eq!(Path(Not, Item(false)).into_iter().next(), Some(true));
-        assert_eq!(Path(Not, Path(Not, Item(true))).into_iter().next(), Some(true));
-        assert_eq!(Path(Not, Path(Not, Item(false))).into_iter().next(), Some(false));
+        assert_eq!(item(true).into_iter().next(), Some(true));
+        assert_eq!(item(false).into_iter().next(), Some(false));
+        assert_eq!(Path(Not, item(true)).into_iter().next(), Some(false));
+        assert_eq!(Path(Not, item(false)).into_iter().next(), Some(true));
+        assert_eq!(path(Not, Path(Not, item(true))).into_iter().next(), Some(true));
+        assert_eq!(path(Not, Path(Not, item(false))).into_iter().next(), Some(false));
     }
 }
