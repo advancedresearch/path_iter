@@ -130,6 +130,7 @@
 use std::iter::IntoIterator;
 
 pub use boolean::*;
+pub use range::*;
 
 /// Syntax sugar for a path sub-type.
 ///
@@ -191,6 +192,7 @@ impl<T> From<Item<T>> for Item<Item<T>> {
 }
 
 mod boolean;
+mod range;
 
 /// Implemented for partial application.
 ///
