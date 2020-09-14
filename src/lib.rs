@@ -295,7 +295,9 @@ pub struct ProductIter<T, U, V, W> {
     inner: T,
     outer: U,
     outer_ty: V,
-    inner_val: Option<W>,
+    inner_vals: Vec<W>,
+    inner_ind: usize,
+    over_diagonal: Option<usize>,
 }
 
 impl<T, U, V, W1, W2> Iterator for ProductIter<T, U, V, W1>
@@ -306,17 +308,50 @@ impl<T, U, V, W1, W2> Iterator for ProductIter<T, U, V, W1>
 {
     type Item = (W1, W2);
     fn next(&mut self) -> Option<Self::Item> {
-        if let Some(u) = &self.inner_val {
-            if let Some(v) = self.outer.next() {
-                Some((u.clone(), v))
-            } else {
-                self.inner_val = self.inner.next();
-                self.outer = self.outer_ty.clone().into_iter();
-                self.next()
+        if let Some(max_len) = self.over_diagonal {
+            if self.inner_vals.len() == 0 {return None};
+
+            if self.inner_ind > 0 {
+                let u = self.inner_vals[self.inner_ind - 1].clone();
+                if let Some(v) = self.outer.next() {
+                    self.inner_ind -= 1;
+                    return Some((u.clone(), v));
+                } else {
+                    return None;
+                }
             }
-        } else {
-            None
+
+            // Remove one value.
+            self.inner_vals.pop();
+            self.inner_ind = self.inner_vals.len();
+            self.outer = self.outer_ty.clone().into_iter();
+            // Skip the first values.
+            for _ in self.inner_ind..max_len {
+                if self.outer.next().is_none() {return None}
+            }
+            return self.next();
         }
+
+        if self.inner_ind > 0 {
+            let u = self.inner_vals[self.inner_ind - 1].clone();
+            if let Some(v) = self.outer.next() {
+                self.inner_ind -= 1;
+                return Some((u.clone(), v));
+            }
+        }
+
+        self.outer = self.outer_ty.clone().into_iter();
+
+        if let Some(val) = self.inner.next() {
+            self.inner_vals.push(val);
+        } else {
+            self.over_diagonal = Some(self.inner_vals.len());
+            self.inner_vals.reverse();
+            self.inner_ind = 0;
+            return self.next();
+        }
+        self.inner_ind = self.inner_vals.len();
+        self.next()
     }
 }
 
@@ -345,11 +380,11 @@ impl<T1, T2, U1, U2, V1, V2, I1, I2> HigherIntoIterator<Item<(U1, U2)>> for (T1,
     fn hinto_iter(self, arg: Item<(U1, U2)>) -> Self::IntoIter {
         let (u1, u2) = arg.inner();
         let (a, b) = self;
-        let mut inner = a.hinto_iter(item(u1));
-        let inner_val = inner.next();
+        let inner = a.hinto_iter(item(u1));
         let outer = b.clone().hinto_iter(item(u2.clone()));
         ProductIter {
-            inner, inner_val, outer, outer_ty: Path(b, item(u2))
+            inner, inner_vals: vec![], outer, outer_ty: Path(b, item(u2)), inner_ind: 0,
+            over_diagonal: None,
         }
     }
 }
