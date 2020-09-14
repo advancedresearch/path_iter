@@ -26,6 +26,27 @@ impl HigherIntoIterator<Item<i64>> for Neg {
     }
 }
 
+/// Identity function.
+#[derive(Clone)]
+pub struct Id;
+
+impl<T> HigherIntoIterator<Item<Range<T>>> for Id {
+    type Item = T;
+    type IntoIter = Range<T>;
+    fn hinto_iter(self, arg: Item<Range<T>>) -> Self::IntoIter {
+        arg.inner()
+    }
+}
+
+impl HigherIntoIterator<Item<i64>> for Id {
+    type Item = i64;
+    type IntoIter = Range<i64>;
+    fn hinto_iter(self, arg: Item<i64>) -> Self::IntoIter {
+        let arg = arg.inner();
+        Range {start: arg, end: arg+1}
+    }
+}
+
 /// Addition.
 #[derive(Clone)]
 pub struct Add;
