@@ -96,3 +96,56 @@ impl HigherIntoIterator<Item<i64>> for Add {
         Add.hinto_iter(item(arg..arg+1))
     }
 }
+
+/// Square.
+#[derive(Clone)]
+pub struct Square;
+
+/// Iterates over numbers that squares up to some range.
+pub struct SquareRangeIter {
+    range: Range<i64>,
+    ind: i64,
+}
+
+impl Iterator for SquareRangeIter {
+    type Item = i64;
+    fn next(&mut self) -> Option<Self::Item> {
+        loop {
+            if self.ind >= self.range.end {return None};
+
+            let arg = self.ind;
+            self.ind += 1;
+
+            let root = (arg as f64).sqrt() as i64;
+            if root * root == arg {
+                return Some(root);
+            }
+        }
+    }
+}
+
+impl HigherIntoIterator<Item<Range<i64>>> for Square {
+    type Item = i64;
+    type IntoIter = SquareRangeIter;
+    fn hinto_iter(self, arg: Item<Range<i64>>) -> Self::IntoIter {
+        let arg = arg.inner();
+        SquareRangeIter {
+            ind: arg.start,
+            range: arg,
+        }
+    }
+}
+
+impl HigherIntoIterator<Item<i64>> for Square {
+    type Item = i64;
+    type IntoIter = Range<i64>;
+    fn hinto_iter(self, arg: Item<i64>) -> Self::IntoIter {
+        let arg = arg.inner();
+        let root = (arg as f64).sqrt() as i64;
+        if root * root == arg {
+            Range {start: root, end: root+1}
+        } else {
+            Range {start: 0, end: 0}
+        }
+    }
+}
