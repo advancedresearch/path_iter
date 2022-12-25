@@ -452,10 +452,10 @@ impl<T, U, W1, W2> Iterator for ProductIter<T, U, W1, W2>
             }
         }
 
-        if self.inner_ind >= self.inner_vals.len() &&
+        if self.inner_ind >= self.inner_vals.len() ||
            self.outer_ind >= self.outer_vals.len()
         {
-            return None
+            None
         } else {
             let u = self.inner_vals[self.inner_ind].clone();
             let v = self.outer_vals[self.outer_ind].clone();
@@ -465,7 +465,7 @@ impl<T, U, W1, W2> Iterator for ProductIter<T, U, W1, W2>
             );
             self.inner_ind = a;
             self.outer_ind = b;
-            return Some((u, v))
+            Some((u, v))
         }
     }
 }
