@@ -328,67 +328,145 @@ impl<T, U, V> Iterator for EitherIter<T, U>
 ///
 /// For example, `[(And, Or)] (true, false)`
 /// iterates over the product of `[And] true` and `[Or] false`.
-pub struct ProductIter<T, U, V, W> {
+pub struct ProductIter<T, U, V1, V2> {
+    // Left/first iterator.
     inner: T,
+    // Right/second iterator.
     outer: U,
-    outer_ty: V,
-    inner_vals: Vec<W>,
+    // The object that turns into the second iterator.
+    // outer_ty: V,
+    // Stores values that are cloned from the first iterator.
+    inner_vals: Vec<V1>,
+    // Stores values that are cloned from the second iterator.
+    outer_vals: Vec<V2>,
+    // The index of the cloned value from the first iterator.
     inner_ind: usize,
-    over_diagonal: Option<usize>,
+    // The index of the cloned value from the second iterator.
+    outer_ind: usize,
 }
 
-impl<T, U, V, W1, W2> Iterator for ProductIter<T, U, V, W1>
+#[derive(Debug, PartialEq, Eq)]
+enum State {
+    Top,
+    TopLeft,
+    TopRight,
+    Middle,
+    MiddleRight,
+    MiddleBottom,
+    MiddleLeft,
+    MiddleHorizontal,
+    BottomRight,
+    BottomLeft,
+    Outside,
+    OutsideRight,
+    OutsideBottom,
+}
+
+impl State {
+    pub fn new((a, b): (usize, usize), (n, m): (usize, usize)) -> State {
+        let origo = (a == 0) && (b == 0);
+        let top = a == 0;
+        let left = b == 0;
+        let right = (b + 1) == m;
+        let bottom = (a + 1) == n;
+        let bottom_right = right && bottom;
+        let top_right = top && right;
+        let bottom_left = left && bottom;
+        let middle_a = (a > 0) && (a < n);
+        let middle_b = (b > 0) && (b < m);
+        let middle = middle_a && middle_b;
+        let outside_a = a >= n;
+        let outside_b = b >= m;
+        let outside = outside_a && outside_b;
+        if outside {State::Outside}
+        else if bottom_right {State::BottomRight}
+        else if bottom && middle_b && !top {State::MiddleBottom}
+        else if right && middle_a {State::MiddleRight}
+        else if top_right && !origo {State::TopRight}
+        else if origo {State::TopLeft}
+        else if top && middle_b && !bottom {State::Top}
+        else if bottom_left {State::BottomLeft}
+        else if left && middle_a {State::MiddleLeft}
+        else if middle {State::Middle}
+        else if outside_a && (middle_b || right || left) {State::OutsideBottom}
+        else if outside_b && (middle_a || bottom || top) {State::OutsideRight}
+        else {State::MiddleHorizontal}
+    }
+
+    pub fn next(&self, (a, b): (usize, usize), (n, m): (usize, usize)) -> (usize, usize) {
+        match self {
+            State::Outside | State::BottomRight => (n, m),
+            State::MiddleRight |
+            State::Top |
+            State::TopRight |
+            State::Middle => (a + 1, b.max(1) - 1),
+            State::OutsideBottom |
+            State::MiddleBottom |
+            State::BottomLeft |
+            State::MiddleLeft => {
+                let (a, b) = (0, a + b + 1);
+                let new_state = State::new((a, b), (n, m));
+                if &new_state == self {return (n, m)};
+                if new_state == State::TopRight {return (a, b)};
+                new_state.next((a, b), (n, m))
+            }
+            State::OutsideRight => {
+                let k = a + b;
+                let (a, b) = (k - (m - 1), m - 1);
+                let new_state = State::new((a, b), (n, m));
+                if &new_state == self {return (n, m)};
+                if new_state == State::OutsideBottom {return (n, m)};
+                if new_state == State::BottomRight {return (a, b)};
+                if new_state == State::MiddleRight {return (a, b)};
+                new_state.next((a, b), (n, m))
+            }
+            State::TopLeft => {
+                let new_state = State::new((0, 1), (n, m));
+                if new_state == State::OutsideRight {return (1, 0)};
+                (0, 1)
+            }
+            State::MiddleHorizontal => (0, a + b + 1),
+        }
+    }
+}
+
+fn diag_prod((a, b): (usize, usize), (n, m): (usize, usize)) -> (usize, usize) {
+    let state = State::new((a, b), (n, m));
+    state.next((a, b), (n, m))
+}
+
+impl<T, U, W1, W2> Iterator for ProductIter<T, U, W1, W2>
     where T: Iterator<Item = W1>,
           U: Iterator<Item = W2>,
-          V: Clone + IntoIterator<Item = W2, IntoIter = U>,
-          W1: Clone
+          W1: Clone,
+          W2: Clone,
 {
     type Item = (W1, W2);
     fn next(&mut self) -> Option<Self::Item> {
-        if let Some(max_len) = self.over_diagonal {
-            if self.inner_vals.len() == 0 {return None};
-
-            if self.inner_ind > 0 {
-                let u = self.inner_vals[self.inner_ind - 1].clone();
-                if let Some(v) = self.outer.next() {
-                    self.inner_ind -= 1;
-                    return Some((u.clone(), v));
-                } else {
-                    return None;
-                }
+        for _ in 0..2 {
+            if let Some(u) = self.inner.next() {
+                self.inner_vals.push(u);
             }
-
-            // Remove one value.
-            self.inner_vals.pop();
-            self.inner_ind = self.inner_vals.len();
-            self.outer = self.outer_ty.clone().into_iter();
-            // Skip the first values.
-            for _ in self.inner_ind..max_len {
-                if self.outer.next().is_none() {return None}
-            }
-            return self.next();
-        }
-
-        if self.inner_ind > 0 {
-            let u = self.inner_vals[self.inner_ind - 1].clone();
             if let Some(v) = self.outer.next() {
-                self.inner_ind -= 1;
-                return Some((u.clone(), v));
+                self.outer_vals.push(v);
             }
         }
 
-        self.outer = self.outer_ty.clone().into_iter();
-
-        if let Some(val) = self.inner.next() {
-            self.inner_vals.push(val);
+        if self.inner_ind >= self.inner_vals.len() &&
+           self.outer_ind >= self.outer_vals.len()
+        {
+            return None
         } else {
-            self.over_diagonal = Some(self.inner_vals.len());
-            self.inner_vals.reverse();
-            self.inner_ind = 0;
-            return self.next();
+            let u = self.inner_vals[self.inner_ind].clone();
+            let v = self.outer_vals[self.outer_ind].clone();
+            let (a, b) = diag_prod(
+                (self.inner_ind, self.outer_ind),
+                (self.inner_vals.len(), self.outer_vals.len())
+            );
+            self.inner_ind = a;
+            self.outer_ind = b;
+            return Some((u, v))
         }
-        self.inner_ind = self.inner_vals.len();
-        self.next()
     }
 }
 
@@ -413,15 +491,19 @@ impl<T1, T2, U1, U2, V1, V2, I1, I2> HigherIntoIterator<Item<(U1, U2)>> for (T1,
           U2: Clone
 {
     type Item = (V1, V2);
-    type IntoIter = ProductIter<I1, I2, PathEnd<T2, U2>, V1>;
+    type IntoIter = ProductIter<I1, I2, V1, V2>;
     fn hinto_iter(self, arg: Item<(U1, U2)>) -> Self::IntoIter {
         let (u1, u2) = arg.inner();
         let (a, b) = self;
         let inner = a.hinto_iter(item(u1));
-        let outer = b.clone().hinto_iter(item(u2.clone()));
+        let outer = b.hinto_iter(item(u2));
         ProductIter {
-            inner, inner_vals: vec![], outer, outer_ty: Path(b, item(u2)), inner_ind: 0,
-            over_diagonal: None,
+            inner,
+            outer,
+            inner_vals: vec![],
+            outer_vals: vec![],
+            inner_ind: 0,
+            outer_ind: 0,
         }
     }
 }
@@ -532,5 +614,59 @@ mod tests {
         assert_eq!(Path(Not, item(false)).into_iter().next(), Some(true));
         assert_eq!(path(Not, Path(Not, item(true))).into_iter().next(), Some(true));
         assert_eq!(path(Not, Path(Not, item(false))).into_iter().next(), Some(false));
+    }
+
+    #[test]
+    fn test_diag() {
+        assert_eq!(diag_prod((0, 0), (0, 0)), (0, 0));
+        assert_eq!(diag_prod((1, 1), (0, 0)), (0, 0));
+
+        assert_eq!(diag_prod((0, 0), (1, 1)), (1, 1));
+        assert_eq!(diag_prod((1, 0), (1, 1)), (1, 1));
+        assert_eq!(diag_prod((0, 1), (1, 1)), (1, 1));
+
+        assert_eq!(diag_prod((0, 0), (2, 2)), (0, 1));
+        assert_eq!(diag_prod((0, 1), (2, 2)), (1, 0));
+        assert_eq!(diag_prod((1, 0), (2, 2)), (1, 1));
+        assert_eq!(diag_prod((1, 1), (2, 2)), (2, 2));
+
+        assert_eq!(diag_prod((0, 0), (3, 3)), (0, 1));
+        assert_eq!(diag_prod((0, 1), (3, 3)), (1, 0));
+        assert_eq!(diag_prod((1, 0), (3, 3)), (0, 2));
+        assert_eq!(diag_prod((0, 2), (3, 3)), (1, 1));
+        assert_eq!(diag_prod((1, 1), (3, 3)), (2, 0));
+        assert_eq!(diag_prod((2, 0), (3, 3)), (1, 2));
+        assert_eq!(diag_prod((1, 2), (3, 3)), (2, 1));
+        assert_eq!(diag_prod((2, 1), (3, 3)), (2, 2));
+        assert_eq!(diag_prod((2, 2), (3, 3)), (3, 3));
+
+        assert_eq!(diag_prod((3, 2), (4, 4)), (3, 3));
+
+        assert_eq!(diag_prod((0, 0), (3, 1)), (1, 0));
+        assert_eq!(diag_prod((0, 0), (1, 3)), (0, 1));
+        assert_eq!(diag_prod((0, 1), (1, 6)), (0, 2));
+    }
+
+    #[test]
+    fn test_product() {
+        let mut x = path!([(Add, Add)] (0, 0)).into_iter();
+        assert_eq!(x.next(), Some(((0, 0), (0, 0))));
+        assert_eq!(x.next(), Some(((0, 0), (1, -1))));
+        assert_eq!(x.next(), Some(((1, -1), (0, 0))));
+        assert_eq!(x.next(), Some(((1, -1), (1, -1))));
+        assert_eq!(x.next(), Some(((-1, 1), (0, 0))));
+        assert_eq!(x.next(), Some(((1, -1), (-1, 1))));
+        assert_eq!(x.next(), Some(((-1, 1), (1, -1))));
+
+        let mut x = path!([(Add, Id)] (0, 0)).into_iter();
+        assert_eq!(x.next(), Some(((0, 0), 0)));
+        assert_eq!(x.next(), Some(((1, -1), 0)));
+        assert_eq!(x.next(), Some(((-1, 1), 0)));
+        assert_eq!(x.next(), Some(((2, -2), 0)));
+
+        let mut x = path!([(Id, Add)] (0, 0)).into_iter();
+        assert_eq!(x.next(), Some((0, (0, 0))));
+        assert_eq!(x.next(), Some((0, (1, -1))));
+        assert_eq!(x.next(), Some((0, (-1, 1))));
     }
 }
