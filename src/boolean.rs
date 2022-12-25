@@ -73,6 +73,15 @@ impl PApp for Xor {
     }
 }
 
+impl PApp for Imply {
+    type Arg = bool;
+    type Ret = Either<Idb, True1>;
+    fn papp(self, b: bool) -> Self::Ret {
+        if b {Either::Left(Idb)}
+        else {Either::Right(True1)}
+    }
+}
+
 impl PApp for Eqb {
     type Arg = bool;
     type Ret = Either<Idb, Not>;
