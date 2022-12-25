@@ -268,6 +268,13 @@ pub fn item<T>(a: T) -> Item<T> {Either::Left(a)}
 /// Construct a path composition.
 pub fn path<T, U>(a: T, b: U) -> PathComp<T, U> {Path(a, Either::Right(b))}
 
+/// Gets the pullback of two maps `f` and `g`.
+///
+/// For more information about pullbacks, see [wikipedia article](https://en.wikipedia.org/wiki/Pullback_(category_theory)).
+pub fn pullback<T, U>(f: T, g: U) -> path_type!([(T, U), Eqb] bool) {
+    path!([(f, g), Eqb] true)
+}
+
 impl<T> Item<T> {
     /// Gets the inner value.
     pub fn inner(self) -> T {
