@@ -179,6 +179,33 @@ macro_rules! path(
     };
 );
 
+/// Syntax sugar for the type of a path sub-type.
+///
+/// For example:
+/// ```rust
+/// use path_iter::*;
+///
+/// fn main() {
+///     for a in imply(false) {
+///         // Prints `(true, false)`
+///         println!("{:?}", a);
+///     }
+/// }
+///
+/// pub fn imply(b: bool) -> path_type!([(Not, Idb)] [Or] bool) {
+///     path!([(Not, Idb)] [Or] b)
+/// }
+/// ```
+#[macro_export]
+macro_rules! path_type(
+    ([$x:ty] [$y:ty] $z:ty) => {
+        PathComp<$x, path_type!([$y] $z)>
+    };
+    ([$x:ty] $y:ty) => {
+        PathEnd<$x, $y>
+    };
+);
+
 /// Stores a path sub-type with either `[T] U` (left) or `[T] [V] ...` (right).
 #[derive(Clone)]
 pub struct Path<T, U, V>(pub T, pub Either<U, V>);
