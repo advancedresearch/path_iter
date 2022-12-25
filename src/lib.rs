@@ -198,6 +198,9 @@ macro_rules! path(
 /// ```
 #[macro_export]
 macro_rules! path_type(
+    ([$x0:ty , $($x:ty),+ $(,)?] $z:ty) => {
+        PathComp<$x0, path_type!([$($x),*] $z)>
+    };
     ([$x:ty] [$y:ty] $z:ty) => {
         PathComp<$x, path_type!([$y] $z)>
     };
