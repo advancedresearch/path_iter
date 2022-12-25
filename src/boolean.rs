@@ -21,6 +21,10 @@ pub struct Eqb;
 #[derive(Clone)]
 pub struct Xor;
 
+/// Logical IMPLY.
+#[derive(Clone)]
+pub struct Imply;
+
 /// A boolean unary function that returns `false`.
 #[derive(Clone)]
 pub struct False1;
@@ -181,6 +185,23 @@ impl HigherIntoIterator<Item<bool>> for Xor {
     type IntoIter = std::vec::IntoIter<(bool, bool)>;
     fn hinto_iter(self, arg: Item<bool>) -> Self::IntoIter {
         Eqb.hinto_iter(item(!arg.inner()))
+    }
+}
+
+impl HigherIntoIterator<Item<bool>> for Imply {
+    type Item = (bool, bool);
+    type IntoIter = std::vec::IntoIter<(bool, bool)>;
+    fn hinto_iter(self, arg: Item<bool>) -> Self::IntoIter {
+        match arg.inner() {
+            false => vec![
+                (true, false)
+            ].into_iter(),
+            true => vec![
+                (false, false),
+                (false, true),
+                (true, true),
+            ].into_iter()
+        }
     }
 }
 
